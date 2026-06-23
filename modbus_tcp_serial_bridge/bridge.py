@@ -172,6 +172,8 @@ async def diagnose_loop(client, slave_id):
                     "✨✨✨ SUCCES! Communicatie werkt! De draden zitten goed! ✨✨✨\n"
                     f"   Gelezen waarde op register 32104 (SoC): {registers[0]}%"
                 )
+                logger.info("🎯 Diagnose-loop succesvol afgerond en gestopt. De bridge blijft actief voor Home Assistant!")
+                return
         except Exception as e:
             err_str = str(e)
             err_lower = err_str.lower()

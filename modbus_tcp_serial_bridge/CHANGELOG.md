@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.6
+- **Update**: Stop the diagnostic loop once connection has been successfully verified to prevent log spam and serial bus traffic.
+
 ## 1.1.5
 - **Fix**: Adjusted the default baudrate from `9600` to `115200` to match Duravolt specification.
 
