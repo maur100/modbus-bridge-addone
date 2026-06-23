@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.3
+- **Fix**: Passed `count` as a keyword argument in `safe_client_call` to satisfy PyModbus 3.x keyword-only parameters.
+
 ## 1.1.2
 - **Fix**: Added support for PyModbus 3.12.x's `device_id=` keyword parameter in `safe_client_call`.
 

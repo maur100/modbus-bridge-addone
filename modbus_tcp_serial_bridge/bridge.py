@@ -75,18 +75,18 @@ class AsyncRemoteDeviceContext(RemoteDeviceContext):
         try:
             if func_code in (1, 2):
                 if func_code == 1:
-                    result = await safe_client_call(self.client, "read_coils", address, count, slave_id=self.slave_id)
+                    result = await safe_client_call(self.client, "read_coils", address, count=count, slave_id=self.slave_id)
                 else:
-                    result = await safe_client_call(self.client, "read_discrete_inputs", address, count, slave_id=self.slave_id)
+                    result = await safe_client_call(self.client, "read_discrete_inputs", address, count=count, slave_id=self.slave_id)
                 if result.isError():
                     logger.error(f"Error reading coils/inputs: {result}")
                     return [False] * count
                 return result.bits[:count]
             elif func_code in (3, 4):
                 if func_code == 3:
-                    result = await safe_client_call(self.client, "read_holding_registers", address, count, slave_id=self.slave_id)
+                    result = await safe_client_call(self.client, "read_holding_registers", address, count=count, slave_id=self.slave_id)
                 else:
-                    result = await safe_client_call(self.client, "read_input_registers", address, count, slave_id=self.slave_id)
+                    result = await safe_client_call(self.client, "read_input_registers", address, count=count, slave_id=self.slave_id)
                 if result.isError():
                     logger.error(f"Error reading registers: {result}")
                     return [0] * count
@@ -146,7 +146,7 @@ async def diagnose_loop(client, slave_id):
     while True:
         try:
             # Lees register 5 (SoC) met safe_client_call om versie-incompatibiliteit te voorkomen
-            response = await safe_client_call(client, "read_holding_registers", 5, 1, slave_id=slave_id)
+            response = await safe_client_call(client, "read_holding_registers", 5, count=1, slave_id=slave_id)
             
             if response.isError():
                 err_str = str(response)
