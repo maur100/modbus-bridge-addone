@@ -15,7 +15,7 @@ ports:
   502/tcp: 502
 uart: true
 options:
-  serial_port: "/dev/ttyUSB0"
+  serial_port: null
   baudrate: 9600
   bytesize: 8
   stopbits: 1
@@ -23,7 +23,7 @@ options:
   slave_id: 1
   tcp_port: 502
 schema:
-  serial_port: str
+  serial_port: "device(subsystem=tty)"
   baudrate: int
   bytesize: int
   stopbits: int
