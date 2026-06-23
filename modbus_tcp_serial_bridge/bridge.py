@@ -33,6 +33,55 @@ except ImportError as e:
     sys.exit(1)
 
 
+class AsyncRemoteDeviceContext(RemoteDeviceContext):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.client = args[0] if args else kwargs.get("client")
+        self.slave_id = (
+            kwargs.get("device_id")
+            or kwargs.get("unit")
+            or kwargs.get("slave")
+            or (args[1] if len(args) > 1 else 1)
+        )
+
+    async def async_getValues(self, func_code, address, count=1):
+        try:
+            if func_code in (1, 2):
+                if func_code == 1:
+                    result = await self.client.read_coils(address, count, slave=self.slave_id)
+                else:
+                    result = await self.client.read_discrete_inputs(address, count, slave=self.slave_id)
+                if result.isError():
+                    logger.error(f"Error reading coils/inputs: {result}")
+                    return [False] * count
+                return result.bits[:count]
+            elif func_code in (3, 4):
+                if func_code == 3:
+                    result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
+                else:
+                    result = await self.client.read_input_registers(address, count, slave=self.slave_id)
+                if result.isError():
+                    logger.error(f"Error reading registers: {result}")
+                    return [0] * count
+                return result.registers[:count]
+        except Exception as e:
+            logger.error(f"Exception during async_getValues: {e}")
+        return []
+
+    async def async_setValues(self, func_code, address, values):
+        try:
+            if func_code == 5:
+                await self.client.write_coil(address, values[0], slave=self.slave_id)
+            elif func_code == 15:
+                await self.client.write_coils(address, values, slave=self.slave_id)
+            elif func_code == 6:
+                await self.client.write_register(address, values[0], slave=self.slave_id)
+            elif func_code == 16:
+                await self.client.write_registers(address, values, slave=self.slave_id)
+        except Exception as e:
+            logger.error(f"Exception during async_setValues: {e}")
+
+
 def load_options():
     """Load configuration options from the Home Assistant Add-on options.json file."""
     options_path = "/data/options.json"
@@ -58,6 +107,61 @@ def load_options():
         logger.info(f"Options file {options_path} not found. Operating with default options.")
         
     return defaults
+
+
+async def diagnose_loop(client, slave_id):
+    logger.info("==========================================")
+    logger.info("🎯 DIAGNOSTISCHE TEST-LOOP GESTART 🎯")
+    logger.info(f" Probeert elke 3 seconden Modbus register 5 (Holding Register 40006/SoC) te lezen van Slave ID: {slave_id}...")
+    logger.info("==========================================")
+    await asyncio.sleep(2.0)  # Wacht 2 seconden om de verbinding te stabiliseren
+    
+    while True:
+        try:
+            # Lees register 5 (SoC)
+            response = await client.read_holding_registers(address=5, count=1, slave=slave_id)
+            
+            if response.isError():
+                err_str = str(response)
+                err_lower = err_str.lower()
+                if "crc" in err_lower:
+                    logger.error(
+                        "🛑 CRC ERROR: Er is corrupte data ontvangen! De draden maken fysiek contact, "
+                        "maar er is ruis, de baudrate/parity is onjuist of er ontbreekt een 120-ohm afsluitweerstand.\n"
+                        f"   Details: {err_str}"
+                    )
+                elif "timeout" in err_lower or "no response" in err_lower or "modbusioexception" in err_lower:
+                    logger.warning(
+                        "⚠️ TIMEOUT/GEEN ANTWOORD: De batterij reageert helemaal niet.\n"
+                        "   Dit betekent meestal dat de A+ en B- draden omgedraaid zijn, "
+                        f"de Waveshare adapter niet goed is aangesloten, of Slave ID {slave_id} onjuist is.\n"
+                        f"   Details: {err_str}"
+                    )
+                else:
+                    logger.error(f"❌ MODBUS FOUT: {err_str}")
+            else:
+                registers = response.registers
+                logger.info(
+                    "✨✨✨ SUCCES! Communicatie werkt! De draden zitten goed! ✨✨✨\n"
+                    f"   Gelezen waarde op register 40006 (SoC): {registers[0]}%"
+                )
+        except Exception as e:
+            err_str = str(e)
+            err_lower = err_str.lower()
+            if "crc" in err_lower:
+                logger.error(
+                    "🛑 CRC ERROR (Exception): Er is corrupte data ontvangen!\n"
+                    f"   Details: {err_str}"
+                )
+            elif "timeout" in err_lower or "no response" in err_lower:
+                logger.warning(
+                    "⚠️ TIMEOUT/GEEN ANTWOORD (Exception): De batterij reageert niet. Controleer A+/B- bedrading.\n"
+                    f"   Details: {err_str}"
+                )
+            else:
+                logger.error(f"💥 INTERNE DIAGNOSE FOUT: {err_str}")
+                
+        await asyncio.sleep(3.0)
 
 
 async def run_bridge():
@@ -105,28 +209,31 @@ async def run_bridge():
         
     logger.info(f"Successfully connected and opened serial port: {port}")
     
-    # Initialize RemoteDeviceContext/RemoteSlaveContext to forward requests to the serial client.
-    # Fallback to handle signature differences and keyword argument variations.
+    # Start the diagnostics task in the background
+    asyncio.create_task(diagnose_loop(serial_client, slave_id))
+    
+    # Initialize AsyncRemoteDeviceContext (our custom async-aware context) to forward requests.
+    # Fallback to handle signature differences and keyword argument variations of the base class.
     store = None
     try:
         # Modern PyModbus v3.x signature (RemoteDeviceContext with device_id)
-        store = RemoteDeviceContext(serial_client, device_id=slave_id)
-        logger.info(f"Initialized RemoteDeviceContext with device_id={slave_id}")
+        store = AsyncRemoteDeviceContext(serial_client, device_id=slave_id)
+        logger.info(f"Initialized AsyncRemoteDeviceContext with device_id={slave_id}")
     except TypeError:
         try:
             # Fallback for RemoteSlaveContext/RemoteDeviceContext with unit=
-            store = RemoteDeviceContext(serial_client, unit=slave_id)
-            logger.info(f"Initialized RemoteDeviceContext with unit={slave_id}")
+            store = AsyncRemoteDeviceContext(serial_client, unit=slave_id)
+            logger.info(f"Initialized AsyncRemoteDeviceContext with unit={slave_id}")
         except TypeError:
             try:
                 # Fallback for RemoteSlaveContext/RemoteDeviceContext with slave=
-                store = RemoteDeviceContext(serial_client, slave=slave_id)
-                logger.info(f"Initialized RemoteDeviceContext with slave={slave_id}")
+                store = AsyncRemoteDeviceContext(serial_client, slave=slave_id)
+                logger.info(f"Initialized AsyncRemoteDeviceContext with slave={slave_id}")
             except TypeError:
                 try:
                     # Fallback to positional argument
-                    store = RemoteDeviceContext(serial_client, slave_id)
-                    logger.info(f"Initialized RemoteDeviceContext with positional unit/device ID: {slave_id}")
+                    store = AsyncRemoteDeviceContext(serial_client, slave_id)
+                    logger.info(f"Initialized AsyncRemoteDeviceContext with positional unit/device ID: {slave_id}")
                 except Exception as context_err:
                     logger.critical(f"Could not instantiate remote device context: {context_err}")
                     await serial_client.close()
