@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.2
+- **Fix**: Added support for PyModbus 3.12.x's `device_id=` keyword parameter in `safe_client_call`.
+
 ## 1.1.1
 - **Fix**: Resolved `TypeError: got an unexpected keyword argument 'slave'` in older PyModbus versions by dynamically falling back to `unit=`.
 

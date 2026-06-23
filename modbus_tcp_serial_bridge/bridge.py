@@ -35,12 +35,29 @@ except ImportError as e:
 
 async def safe_client_call(client, method_name, *args, slave_id, **kwargs):
     method = getattr(client, method_name)
+    
+    # Try with 'slave' keyword argument
     try:
         return await method(*args, slave=slave_id, **kwargs)
     except TypeError as e:
-        if "unexpected keyword argument 'slave'" in str(e):
-            return await method(*args, unit=slave_id, **kwargs)
-        raise e
+        if "unexpected keyword argument 'slave'" not in str(e):
+            raise e
+            
+    # Try with 'device_id' keyword argument (used in PyModbus 3.12.x)
+    try:
+        return await method(*args, device_id=slave_id, **kwargs)
+    except TypeError as e:
+        if "unexpected keyword argument 'device_id'" not in str(e):
+            raise e
+            
+    # Try with 'unit' keyword argument (used in older PyModbus versions)
+    try:
+        return await method(*args, unit=slave_id, **kwargs)
+    except TypeError as e:
+        if "unexpected keyword argument 'unit'" not in str(e):
+            raise e
+            
+    raise TypeError(f"Could not find a valid slave/device_id/unit parameter name for {method_name}")
 
 
 class AsyncRemoteDeviceContext(RemoteDeviceContext):
