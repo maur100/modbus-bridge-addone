@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.4
+- **Fix**: Changed the hardcoded test register from `5` to `32104` (SoC) in the diagnostic loop to avoid `ILLEGAL DATA ADDRESS` errors.
+
 ## 1.1.3
 - **Fix**: Passed `count` as a keyword argument in `safe_client_call` to satisfy PyModbus 3.x keyword-only parameters.
 

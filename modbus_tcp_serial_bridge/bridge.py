@@ -139,14 +139,14 @@ def load_options():
 async def diagnose_loop(client, slave_id):
     logger.info("==========================================")
     logger.info("🎯 DIAGNOSTISCHE TEST-LOOP GESTART 🎯")
-    logger.info(f" Probeert elke 3 seconden Modbus register 5 (Holding Register 40006/SoC) te lezen van Slave ID: {slave_id}...")
+    logger.info(f" Probeert elke 3 seconden Modbus register 32104 (SoC) te lezen van Slave ID: {slave_id}...")
     logger.info("==========================================")
     await asyncio.sleep(2.0)  # Wacht 2 seconden om de verbinding te stabiliseren
     
     while True:
         try:
-            # Lees register 5 (SoC) met safe_client_call om versie-incompatibiliteit te voorkomen
-            response = await safe_client_call(client, "read_holding_registers", 5, count=1, slave_id=slave_id)
+            # Lees register 32104 (SoC) met safe_client_call om versie-incompatibiliteit te voorkomen
+            response = await safe_client_call(client, "read_holding_registers", 32104, count=1, slave_id=slave_id)
             
             if response.isError():
                 err_str = str(response)
@@ -170,7 +170,7 @@ async def diagnose_loop(client, slave_id):
                 registers = response.registers
                 logger.info(
                     "✨✨✨ SUCCES! Communicatie werkt! De draden zitten goed! ✨✨✨\n"
-                    f"   Gelezen waarde op register 40006 (SoC): {registers[0]}%"
+                    f"   Gelezen waarde op register 32104 (SoC): {registers[0]}%"
                 )
         except Exception as e:
             err_str = str(e)
