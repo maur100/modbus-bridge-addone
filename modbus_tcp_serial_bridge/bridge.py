@@ -33,6 +33,16 @@ except ImportError as e:
     sys.exit(1)
 
 
+async def safe_client_call(client, method_name, *args, slave_id, **kwargs):
+    method = getattr(client, method_name)
+    try:
+        return await method(*args, slave=slave_id, **kwargs)
+    except TypeError as e:
+        if "unexpected keyword argument 'slave'" in str(e):
+            return await method(*args, unit=slave_id, **kwargs)
+        raise e
+
+
 class AsyncRemoteDeviceContext(RemoteDeviceContext):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -48,18 +58,18 @@ class AsyncRemoteDeviceContext(RemoteDeviceContext):
         try:
             if func_code in (1, 2):
                 if func_code == 1:
-                    result = await self.client.read_coils(address, count, slave=self.slave_id)
+                    result = await safe_client_call(self.client, "read_coils", address, count, slave_id=self.slave_id)
                 else:
-                    result = await self.client.read_discrete_inputs(address, count, slave=self.slave_id)
+                    result = await safe_client_call(self.client, "read_discrete_inputs", address, count, slave_id=self.slave_id)
                 if result.isError():
                     logger.error(f"Error reading coils/inputs: {result}")
                     return [False] * count
                 return result.bits[:count]
             elif func_code in (3, 4):
                 if func_code == 3:
-                    result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
+                    result = await safe_client_call(self.client, "read_holding_registers", address, count, slave_id=self.slave_id)
                 else:
-                    result = await self.client.read_input_registers(address, count, slave=self.slave_id)
+                    result = await safe_client_call(self.client, "read_input_registers", address, count, slave_id=self.slave_id)
                 if result.isError():
                     logger.error(f"Error reading registers: {result}")
                     return [0] * count
@@ -71,13 +81,13 @@ class AsyncRemoteDeviceContext(RemoteDeviceContext):
     async def async_setValues(self, func_code, address, values):
         try:
             if func_code == 5:
-                await self.client.write_coil(address, values[0], slave=self.slave_id)
+                await safe_client_call(self.client, "write_coil", address, values[0], slave_id=self.slave_id)
             elif func_code == 15:
-                await self.client.write_coils(address, values, slave=self.slave_id)
+                await safe_client_call(self.client, "write_coils", address, values, slave_id=self.slave_id)
             elif func_code == 6:
-                await self.client.write_register(address, values[0], slave=self.slave_id)
+                await safe_client_call(self.client, "write_register", address, values[0], slave_id=self.slave_id)
             elif func_code == 16:
-                await self.client.write_registers(address, values, slave=self.slave_id)
+                await safe_client_call(self.client, "write_registers", address, values, slave_id=self.slave_id)
         except Exception as e:
             logger.error(f"Exception during async_setValues: {e}")
 
@@ -118,8 +128,8 @@ async def diagnose_loop(client, slave_id):
     
     while True:
         try:
-            # Lees register 5 (SoC)
-            response = await client.read_holding_registers(address=5, count=1, slave=slave_id)
+            # Lees register 5 (SoC) met safe_client_call om versie-incompatibiliteit te voorkomen
+            response = await safe_client_call(client, "read_holding_registers", 5, 1, slave_id=slave_id)
             
             if response.isError():
                 err_str = str(response)
