@@ -114,7 +114,7 @@ def load_options():
     options_path = "/data/options.json"
     defaults = {
         "serial_port": "/dev/ttyUSB0",
-        "baudrate": 9600,
+        "baudrate": 115200,
         "bytesize": 8,
         "stopbits": 1,
         "parity": "N",

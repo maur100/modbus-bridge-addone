@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.5
+- **Fix**: Adjusted the default baudrate from `9600` to `115200` to match Duravolt specification.
+
 ## 1.1.4
 - **Fix**: Changed the hardcoded test register from `5` to `32104` (SoC) in the diagnostic loop to avoid `ILLEGAL DATA ADDRESS` errors.
 
