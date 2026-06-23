@@ -1,0 +1,32 @@
+name: "Modbus TCP to Serial Bridge"
+description: "Vertaalt Modbus TCP (poort 502) naar een seriële RS485/RTU-verbinding (/dev/ttyUSB0) voor een Marstek thuisbatterij."
+version: "1.0.0"
+slug: "modbus_tcp_serial_bridge"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+boot: "auto"
+startup: "services"
+ports:
+  502/tcp: 502
+uart: true
+options:
+  serial_port: "/dev/ttyUSB0"
+  baudrate: 9600
+  bytesize: 8
+  stopbits: 1
+  parity: "N"
+  slave_id: 1
+  tcp_port: 502
+schema:
+  serial_port: str
+  baudrate: int
+  bytesize: int
+  stopbits: int
+  parity: list(N|E|O)
+  slave_id: int
+  tcp_port: int
