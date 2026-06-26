@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+- **Feature**: Added customizable `timeout` and `reconnect_delay` configuration parameters.
+- **Performance**: Upgraded the asynchronous serial connection driver to `pyserial-asyncio-fast` to prevent event-loop starvation and reduce latency.
+- **Fix**: Disabled strict inter-byte timing on the serial socket to prevent packet fragmentation/CRC errors on USB-to-RS485 adapters.
+- **Optimization**: Cached PyModbus parameter resolution in `safe_client_call` to eliminate exception overhead on every request.
+
 ## 1.1.6
 - **Update**: Stop the diagnostic loop once connection has been successfully verified to prevent log spam and serial bus traffic.
 

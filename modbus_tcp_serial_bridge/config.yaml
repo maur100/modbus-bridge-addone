@@ -1,6 +1,6 @@
 name: "Modbus TCP to Serial Bridge"
 description: "Vertaalt Modbus TCP (poort 502) naar een seriële RS485/RTU-verbinding (/dev/ttyUSB0) voor een Marstek thuisbatterij."
-version: "1.1.6"
+version: "1.2.0"
 slug: "modbus_tcp_serial_bridge"
 init: false
 arch:
