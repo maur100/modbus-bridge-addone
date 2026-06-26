@@ -8,7 +8,7 @@ SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 RUN pip install --no-cache-dir \
     pymodbus==3.12.1 \
     pyserial==3.5 \
-    pyserial-asyncio-fast==0.1.2
+    pyserial-asyncio-fast==0.16
 
 # Copy application files
 COPY run.sh /app/run.sh
