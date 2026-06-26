@@ -13,8 +13,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("modbus_bridge")
 
+# Import and monkey-patch serial_asyncio with serial_asyncio_fast if available
+try:
+    import serial_asyncio_fast
+    sys.modules["serial_asyncio"] = serial_asyncio_fast
+    logger.info("Successfully monkey-patched serial_asyncio with serial_asyncio_fast for low latency.")
+except ImportError:
+    logger.warning("serial_asyncio_fast not found, using standard serial_asyncio.")
+
 # Import PyModbus modules
 try:
+
     from pymodbus import FramerType
     from pymodbus.client import AsyncModbusSerialClient
     from pymodbus.datastore import ModbusServerContext
@@ -33,26 +42,40 @@ except ImportError as e:
     sys.exit(1)
 
 
+_slave_param_name = None
+
+
 async def safe_client_call(client, method_name, *args, slave_id, **kwargs):
+    global _slave_param_name
     method = getattr(client, method_name)
     
+    if _slave_param_name is not None:
+        kwargs[_slave_param_name] = slave_id
+        return await method(*args, **kwargs)
+        
     # Try with 'slave' keyword argument
     try:
-        return await method(*args, slave=slave_id, **kwargs)
+        res = await method(*args, slave=slave_id, **kwargs)
+        _slave_param_name = "slave"
+        return res
     except TypeError as e:
         if "unexpected keyword argument 'slave'" not in str(e):
             raise e
             
     # Try with 'device_id' keyword argument (used in PyModbus 3.12.x)
     try:
-        return await method(*args, device_id=slave_id, **kwargs)
+        res = await method(*args, device_id=slave_id, **kwargs)
+        _slave_param_name = "device_id"
+        return res
     except TypeError as e:
         if "unexpected keyword argument 'device_id'" not in str(e):
             raise e
             
     # Try with 'unit' keyword argument (used in older PyModbus versions)
     try:
-        return await method(*args, unit=slave_id, **kwargs)
+        res = await method(*args, unit=slave_id, **kwargs)
+        _slave_param_name = "unit"
+        return res
     except TypeError as e:
         if "unexpected keyword argument 'unit'" not in str(e):
             raise e
@@ -119,7 +142,9 @@ def load_options():
         "stopbits": 1,
         "parity": "N",
         "slave_id": 1,
-        "tcp_port": 502
+        "tcp_port": 502,
+        "timeout": 0.5,
+        "reconnect_delay": 0.1
     }
     
     if os.path.exists(options_path):
@@ -204,6 +229,8 @@ async def run_bridge():
     parity = config["parity"]
     slave_id = int(config["slave_id"])
     tcp_port = int(config["tcp_port"])
+    timeout = float(config["timeout"])
+    reconnect_delay = float(config["reconnect_delay"])
     
     logger.info("==========================================")
     logger.info("   Modbus TCP-to-RTU Serial Bridge        ")
@@ -215,6 +242,8 @@ async def run_bridge():
     logger.info(f" Parity:      {parity}")
     logger.info(f" Slave ID:    {slave_id}")
     logger.info(f" TCP Port:    {tcp_port}")
+    logger.info(f" Timeout:     {timeout}s")
+    logger.info(f" Reconnect:   {reconnect_delay}s")
     logger.info("==========================================")
     
     # Initialize the serial client
@@ -226,7 +255,8 @@ async def run_bridge():
         stopbits=stopbits,
         parity=parity,
         framer=FramerType.RTU,
-        timeout=2.0
+        timeout=timeout,
+        reconnect_delay=reconnect_delay
     )
     
     # Test/Open connection
@@ -237,6 +267,16 @@ async def run_bridge():
         sys.exit(1)
         
     logger.info(f"Successfully connected and opened serial port: {port}")
+    
+    # Set inter_byte_timeout to None on the underlying socket to resolve strict timing issues
+    # that cause split frames/CRC errors on USB-to-RS485 adapters.
+    try:
+        if hasattr(serial_client, "socket") and serial_client.socket is not None:
+            serial_client.socket.inter_byte_timeout = None
+            logger.info("Disabled strict inter-byte timing on the serial socket.")
+    except Exception as e:
+        logger.warning(f"Could not disable strict inter-byte timing: {e}")
+
     
     # Start the diagnostics task in the background
     asyncio.create_task(diagnose_loop(serial_client, slave_id))

@@ -22,6 +22,8 @@ options:
   parity: "N"
   slave_id: 1
   tcp_port: 502
+  timeout: 0.5
+  reconnect_delay: 0.1
 schema:
   serial_port: "device(subsystem=tty)"
   baudrate: int
@@ -30,3 +32,6 @@ schema:
   parity: list(N|E|O)
   slave_id: int
   tcp_port: int
+  timeout: float
+  reconnect_delay: float
+
